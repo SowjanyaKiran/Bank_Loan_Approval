@@ -6,30 +6,63 @@ import base64
 
 # ============ Custom CSS for a beautiful look ============
 def add_bg_and_style():
-    # Use a high-quality background image URL or a local file encoded to base64
-    # Example using a URL
-    # bg_image_url = "https://images.unsplash.com/photo-1518655049386-3e9114b3084f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80"
-    
-    # Or for a local image, encode it to base64
-    # with open("path/to/your/image.jpg", "rb") as image_file:
-    #     encoded_image = base64.b64encode(image_file.read()).decode()
-    # bg_image_base64 = f"data:image/jpeg;base64,{encoded_image}"
-
-    # For this example, let's use a simple background gradient
-    custom_css = """
+    # Hero section with background image
+    hero_section_css = """
     <style>
+    .hero-container {
+        background-image: url('https://images.unsplash.com/photo-1544377193-33e142e09641?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        height: 400px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: white;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        position: relative;
+    }
+    
+    .hero-container::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.4);
+        border-radius: 15px;
+    }
+    
+    .hero-content {
+        position: relative;
+        z-index: 10;
+        padding: 0 20px;
+    }
+
+    .hero-content h1 {
+        color: white;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .hero-content p {
+        font-size: 1.2rem;
+    }
+
+    /* General app styling */
     .stApp {
         background-color: #f0f2f6;
-        background-image: linear-gradient(to right top, #a6c0fe, #c4a9f9, #e094f3, #f77ee6, #ff69d8);
+        background-image: linear-gradient(to right top, #a6c0fe, #c4a9f9, #e094f3, #ff69d8, #ff69d8);
         background-size: cover;
         background-repeat: no-repeat;
         background-attachment: fixed;
     }
 
-    .css-1jc7-133a {
-        color: white;
-    }
-    
     .main .block-container {
         padding: 4rem 1rem;
         background: rgba(255, 255, 255, 0.9);
@@ -37,13 +70,6 @@ def add_bg_and_style():
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
-    h1 {
-        text-align: center;
-        color: #4A90E2;
-        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
     .stButton>button {
         background-color: #4A90E2;
         color: white;
@@ -73,7 +99,7 @@ def add_bg_and_style():
 
     </style>
     """
-    st.markdown(custom_css, unsafe_allow_html=True)
+    st.markdown(hero_section_css, unsafe_allow_html=True)
 
 # ========== 1. Load Pickle Model ==========
 with open("loan_approval_model.pkl", "rb") as f:
@@ -81,6 +107,17 @@ with open("loan_approval_model.pkl", "rb") as f:
 
 # Add styling to the app
 add_bg_and_style()
+
+# ========== Add Hero Section ==========
+st.markdown("""
+<div class="hero-container">
+    <div class="hero-content">
+        <h1>Financial Freedom Starts Here</h1>
+        <p>Your trusted partner for quick and reliable loan approval predictions.</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 
 st.title("🏦 Loan Approval Prediction App")
 st.markdown("Fill the applicant details and check your loan approval status.")
@@ -108,28 +145,35 @@ self_emp_map = {"Yes": 1, "No": 0}
 property_map = {"Urban": 2, "Semiurban": 1, "Rural": 0}
 
 if st.button("Predict Loan Approval"):
-    input_data = [
+    # Create separate lists for categorical and numerical data
+    categorical_data = [
         gender_map[gender],
         married_map[married],
         dependents_map[dependents],
         education_map[education],
         self_emp_map[self_employed],
+        property_map[property_area],
+    ]
+
+    numerical_data = [
         applicant_income,
         coapplicant_income,
         loan_amount,
         loan_term,
         credit_history,
-        property_map[property_area],
     ]
 
-    # Preprocess the input data
-    input_data_as_array = np.array(input_data).reshape(1, -1)
+    # Preprocess the numerical data by scaling it
+    numerical_data_as_array = np.array(numerical_data).reshape(1, -1)
+    scaled_numerical_data = scaler.transform(numerical_data_as_array)
     
-    # Scale the numerical features (6 to 9)
-    # The scaler was trained on all features in the original notebook, so we apply it to all
-    scaled_data = scaler.transform(input_data_as_array)
+    # Combine the scaled numerical data with the categorical data
+    input_data_as_array = np.hstack((
+        np.array(categorical_data).reshape(1, -1),
+        scaled_numerical_data
+    ))
     
-    prediction = model.predict(scaled_data)
+    prediction = model.predict(input_data_as_array)
 
     if prediction[0] == 1:
         st.balloons()
