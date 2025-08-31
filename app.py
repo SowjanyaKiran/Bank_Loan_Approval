@@ -1,71 +1,91 @@
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.ensemble import RandomForestClassifier
+# app.py
+import streamlit as st
 import pickle
+import numpy as np
+import pandas as pd
 
-# --- 1. Load and prepare the data ---
-# This is dummy data to make the script runnable. Replace with your actual data loading logic.
-data = {
-    'Loan_ID': range(1, 101),
-    'Gender': np.random.choice(['Male', 'Female'], 100),
-    'Married': np.random.choice(['Yes', 'No'], 100),
-    'Dependents': np.random.choice(['0', '1', '2', '3+'], 100),
-    'Education': np.random.choice(['Graduate', 'Not Graduate'], 100),
-    'Self_Employed': np.random.choice(['Yes', 'No'], 100),
-    'ApplicantIncome': np.random.randint(1500, 10000, 100),
-    'CoapplicantIncome': np.random.randint(0, 5000, 100),
-    'LoanAmount': np.random.randint(90, 700, 100),
-    'Loan_Amount_Term': np.random.randint(240, 480, 100),
-    'Credit_History': np.random.choice([1.0, 0.0], 100, p=[0.8, 0.2]),
-    'Property_Area': np.random.choice(['Urban', 'Semiurban', 'Rural'], 100),
-    'Loan_Status': np.random.choice(['Y', 'N'], 100, p=[0.7, 0.3])
-}
-df = pd.DataFrame(data)
+# ========== 1. Load Pickle Model ==========
+# Ensure the model file is accessible in the same directory
+try:
+    with open("loan_approval_model.pkl", "rb") as f:
+        model, scaler, le = pickle.load(f)
+except FileNotFoundError:
+    st.error("Error: 'loan_approval_model.pkl' not found. Please run the 'train_model.py' script first to create the model file.")
+    st.stop()
+except Exception as e:
+    st.error(f"Error loading the model file: {e}")
+    st.stop()
 
-# --- 2. Feature Engineering and Encoding ---
-df['LoanAmount_log'] = np.log(df['LoanAmount'])
-df['Total_Income'] = df['ApplicantIncome'] + df['CoapplicantIncome']
 
-# Handle categorical features
-df_encoded = pd.get_dummies(df.drop('Loan_ID', axis=1), columns=['Gender', 'Married', 'Dependents', 'Education', 'Self_Employed', 'Property_Area'])
-df_encoded = df_encoded.replace({True: 1, False: 0})
+st.title("🏦 Loan Approval Prediction App")
+st.markdown("Fill the applicant details and check loan approval status.")
 
-# --- 3. Split data ---
-le = LabelEncoder()
-df_encoded['Loan_Status_Encoded'] = le.fit_transform(df_encoded['Loan_Status'])
+# ========== 2. User Inputs ==========
+st.subheader("Applicant Information")
+gender = st.selectbox("Gender", ["Male", "Female"])
+married = st.selectbox("Married", ["Yes", "No"])
+dependents = st.selectbox("Dependents", ["0", "1", "2", "3+"])
+education = st.selectbox("Education", ["Graduate", "Not Graduate"])
+self_employed = st.selectbox("Self Employed", ["Yes", "No"])
 
-X = df_encoded.drop(['Loan_Status', 'Loan_Status_Encoded'], axis=1)
-y = df_encoded['Loan_Status_Encoded']
+applicant_income = st.number_input("Applicant Income", min_value=0.0, step=100.0)
+coapplicant_income = st.number_input("Co-applicant Income", min_value=0.0, step=100.0)
+loan_amount = st.number_input("Loan Amount", min_value=0.0, step=10.0)
+loan_term = st.number_input("Loan Amount Term (in days)", min_value=0.0, step=12.0)
+credit_history = st.selectbox("Credit History", [1.0, 0.0])
+property_area = st.selectbox("Property Area", ["Urban", "Rural", "Semiurban"])
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+if st.button("Predict Loan Approval"):
+    # Create a dictionary to hold the raw input data
+    input_dict = {
+        'ApplicantIncome': [applicant_income],
+        'CoapplicantIncome': [coapplicant_income],
+        'LoanAmount': [loan_amount],
+        'Loan_Amount_Term': [loan_term],
+        'Credit_History': [credit_history],
+        'Gender_Female': [1 if gender == 'Female' else 0],
+        'Gender_Male': [1 if gender == 'Male' else 0],
+        'Married_No': [1 if married == 'No' else 0],
+        'Married_Yes': [1 if married == 'Yes' else 0],
+        'Dependents_0': [1 if dependents == '0' else 0],
+        'Dependents_1': [1 if dependents == '1' else 0],
+        'Dependents_2': [1 if dependents == '2' else 0],
+        'Dependents_3+': [1 if dependents == '3+' else 0],
+        'Education_Graduate': [1 if education == 'Graduate' else 0],
+        'Education_Not Graduate': [1 if education == 'Not Graduate' else 0],
+        'Self_Employed_No': [1 if self_employed == 'No' else 0],
+        'Self_Employed_Yes': [1 if self_employed == 'Yes' else 0],
+        'Property_Area_Rural': [1 if property_area == 'Rural' else 0],
+        'Property_Area_Semiurban': [1 if property_area == 'Semiurban' else 0],
+        'Property_Area_Urban': [1 if property_area == 'Urban' else 0]
+    }
+    
+    # Convert the dictionary to a pandas DataFrame
+    # The order of columns is crucial and must match the order from training
+    input_df = pd.DataFrame(input_dict)
+    
+    # Scale the input data using the loaded scaler
+    try:
+        X_input_scaled = scaler.transform(input_df)
+    except ValueError as e:
+        st.error(f"ValueError during scaling. Please ensure all input fields are filled correctly and the number of features matches the trained scaler. Error details: {e}")
+        st.stop()
 
-# --- 4. Scale numerical features ---
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-X_test_scaled = scaler.transform(X_test)
+    # Make the prediction
+    prediction = model.predict(X_input_scaled)[0]
+    
+    # Get the probabilities for each class
+    prediction_proba = model.predict_proba(X_input_scaled)[0]
+    
+    # Note: `le.classes_` will give the order of classes (e.g., ['N', 'Y'])
+    # So we can use the label encoder to map probabilities correctly.
+    prob_rejection = prediction_proba[le.transform(['N'])[0]]
+    prob_approval = prediction_proba[le.transform(['Y'])[0]]
 
-# --- 5. Train and optimize the model with GridSearchCV ---
-param_grid = {
-    'n_estimators': [100, 200, 300],
-    'max_depth': [5, 10, None],
-    'min_samples_split': [2, 5, 10]
-}
-rf_model = RandomForestClassifier(random_state=42)
-grid_search = GridSearchCV(estimator=rf_model, param_grid=param_grid, cv=5, n_jobs=-1, verbose=2)
-grid_search.fit(X_train_scaled, y_train)
+    # Display the result to the user
+    result = "✅ Loan Approved" if prediction == 1 else "❌ Loan Not Approved"
 
-# Get the best model
-best_model = grid_search.best_estimator_
-
-print("Model training complete.")
-print(f"Best parameters found: {grid_search.best_params_}")
-print(f"Best cross-validation score: {grid_search.best_score_:.4f}")
-
-# --- 6. Save the model, scaler, and label encoder ---
-# Ensure this file name matches the one in app.py
-with open('loan_approval_model.pkl', 'wb') as f:
-    pickle.dump((best_model, scaler, le), f)
-
-print("Model, scaler, and label encoder saved to 'loan_approval_model.pkl'")
+    st.subheader("Prediction Result:")
+    st.success(result)
+    st.write(f"**Probability of Approval:** {prob_approval:.2f}")
+    st.write(f"**Probability of Rejection:** {prob_rejection:.2f}")
