@@ -73,8 +73,15 @@ if st.button("Predict Loan Approval"):
     # Make the prediction
     prediction = model.predict(X_input_scaled)[0]
     
+    # Get the probabilities for each class
+    prediction_proba = model.predict_proba(X_input_scaled)[0]
+    prob_rejection = prediction_proba[0]
+    prob_approval = prediction_proba[1]
+
     # Display the result to the user
     result = "✅ Loan Approved" if prediction == 1 else "❌ Loan Not Approved"
 
     st.subheader("Prediction Result:")
     st.success(result)
+    st.write(f"**Probability of Approval:** {prob_approval:.2f}")
+    st.write(f"**Probability of Rejection:** {prob_rejection:.2f}")
