@@ -6,6 +6,7 @@ import numpy as np
 # ========== 1. Load Pickle Model ==========
 # Ensure the model file is accessible in the same directory
 try:
+    # This will load your RandomForestClassifier model from GridSearchCV's best estimator
     with open("loan_approval_model.pkl", "rb") as f:
         model, scaler, le = pickle.load(f)
 except FileNotFoundError:
