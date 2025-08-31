@@ -145,35 +145,37 @@ self_emp_map = {"Yes": 1, "No": 0}
 property_map = {"Urban": 2, "Semiurban": 1, "Rural": 0}
 
 if st.button("Predict Loan Approval"):
-    # Create separate lists for categorical and numerical data
-    categorical_data = [
+    # Create a single list with all features in the correct order
+    # The order of features here must match the order used to train the model.
+    full_input_data = [
         gender_map[gender],
         married_map[married],
         dependents_map[dependents],
         education_map[education],
         self_emp_map[self_employed],
-        property_map[property_area],
-    ]
-
-    numerical_data = [
         applicant_income,
         coapplicant_income,
         loan_amount,
         loan_term,
         credit_history,
+        property_map[property_area],
     ]
-
-    # Preprocess the numerical data by scaling it
-    numerical_data_as_array = np.array(numerical_data).reshape(1, -1)
-    scaled_numerical_data = scaler.transform(numerical_data_as_array)
     
-    # Combine the scaled numerical data with the categorical data
-    input_data_as_array = np.hstack((
-        np.array(categorical_data).reshape(1, -1),
-        scaled_numerical_data
+    # Convert to a NumPy array for processing
+    full_input_data_array = np.array(full_input_data).reshape(1, -1)
+    
+    # Identify the numerical features and scale them
+    numerical_features = full_input_data_array[:, 5:10]
+    scaled_numerical_features = scaler.transform(numerical_features)
+    
+    # Combine the scaled numerical data with the unscaled categorical data
+    final_input_array = np.hstack((
+        full_input_data_array[:, :5],  # First 5 are categorical
+        scaled_numerical_features,     # Scaled numerical features
+        full_input_data_array[:, 10:]  # Last one is categorical (Property Area)
     ))
-    
-    prediction = model.predict(input_data_as_array)
+
+    prediction = model.predict(final_input_array)
 
     if prediction[0] == 1:
         st.balloons()
